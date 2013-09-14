@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -36,6 +37,12 @@ int main(void)
         ++ctr;
       }
       std::cout<<ctr<<std::endl;
+      //voice notification
+      if (ctr) {
+        std::stringstream cmd;
+        cmd<<"say \"You have "<<ctr<<" new message"<<(ctr>1?"s":"")<<"!\"";
+        system(cmd.str().c_str());        
+      }
       sleep(300);
       res = curl_easy_perform(curl);
     }
