@@ -5,18 +5,16 @@
 #include <string>
 #include <unistd.h>
 #include </usr/local/include/curl/curl.h>
-std::string str;
 size_t writer( char *ptr, size_t size, size_t nmemb, void *userdata) {
    size_t realsize=size*nmemb;
-   str.append(ptr, realsize);
+   std::string *out = reinterpret_cast<std::string *>(userdata);
+   out->append(ptr, realsize);
    return realsize;
 }
- 
-int main(void)
-{
+
+CURLcode connectImap(std::string *buffer) {
   CURL *curl;
   CURLcode res = CURLE_OK;
- 
   curl = curl_easy_init();
   if(curl) {
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 0);
@@ -24,34 +22,36 @@ int main(void)
     curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER,"theaccesstoken");
     curl_easy_setopt(curl, CURLOPT_URL, "imaps://imap.gmail.com:993/INBOX");
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writer);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, buffer);
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "SEARCH UNSEEN");
     res = curl_easy_perform(curl);
-    while(!res) {
-      std::cout<<"Unread emails #: ";
-      int tmp;
-      int ctr=0;
-      std::stringstream lineStream(str);
-      lineStream>>str;
-      lineStream>>str;
-      while(lineStream >> tmp) {
-        ++ctr;
-      }
-      std::cout<<ctr<<std::endl;
-      //voice notification
-      if (ctr) {
-        std::stringstream cmd;
-        cmd<<"say \"You have "<<ctr<<" new message"<<(ctr>1?"s":"")<<"!\"";
-        system(cmd.str().c_str());        
-      }
-      sleep(300);
-      res = curl_easy_perform(curl);
+  }
+  curl_easy_cleanup(curl);
+  return res;
+}
+
+void notifyByVoice(ctr) {
+  std::stringstream cmd;
+  cmd<<"say \"You have "<<ctr<<" new message"<<(ctr>1?"s":"")<<"!\"";
+  system(cmd.str().c_str());
+}
+ 
+int main(void)
+{
+  std::string str;
+  CURLcode res = connectImap(&str);
+  while(!res) {
+    int tmp;
+    int ctr=0;
+    std::stringstream lineStream(str);
+    lineStream>>str;
+    lineStream>>str;
+    while(lineStream >> tmp) {
+      ++ctr;
     }
-     /* std::stringstream cmd;
-      cmd<<"FETCH "<<i<<" BODY.PEEK[HEADER.FIELDS (\"From\" \"Subject\")]";
-      curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, cmd.str().c_str());
-      res = curl_easy_perform(curl);
-     */
-    curl_easy_cleanup(curl);
+    notifyByVoice(ctr);
+    sleep(300);
+    res = connectImap(&str);
   }
   if(res) {
     printf("Something went wrong.\n");
