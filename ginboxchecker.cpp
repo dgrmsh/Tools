@@ -173,6 +173,8 @@ int main(void)
     }
     std::thread thr1(notifyByBanner,ctr);
     std::thread thr2(notifyByVoice,ctr);
+    thr1.join();
+    thr2.join();
     sleep(180);
     res = connectImap(&str, &properties);
   }
