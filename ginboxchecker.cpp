@@ -1,10 +1,11 @@
+#include <fstream>
+#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
-#include <iostream>
-#include <fstream>
 #include <sstream>
 #include <string>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include </usr/local/include/curl/curl.h>
 
@@ -137,18 +138,28 @@ int main(void)
 {
   std::string str, Email, ClientId, ClientSecret, RefreshToken, Bearer;
   CURLcode res;
+  time_t nextrefresh = 0;
+  time_t tnow;
   res = parseConfig(&Email, &ClientId, &ClientSecret, &RefreshToken);
   if(res) {
     printf("Could not parse the ginboxchecker.conf file. Exiting..\n");
     return (int)res;
   }
-  res = refreshToken(&ClientId, &ClientSecret, &RefreshToken, &Bearer);
-  if(res) {
-    printf("Could not refresh the token. Exiting..\n");
-    return (int)res;
-  }
-  res = connectImap(&str, &Email, &Bearer);
-  while(!res) {
+  while(true) {
+    tnow = time(0);
+    if(tnow > nextrefresh) {
+      nextrefresh = tnow + 3600;
+      res = refreshToken(&ClientId, &ClientSecret, &RefreshToken, &Bearer);
+      if(res) {
+        printf("Could not refresh the token. Exiting..\n");
+        return (int)res;
+      }
+    }
+    res = connectImap(&str, &Email, &Bearer);
+    if(res) {
+      printf("Could not connect to IMAP.\n");
+      return (int)res;
+    }
     int tmp;
     int ctr=0;
     std::stringstream lineStream(str);
@@ -157,12 +168,11 @@ int main(void)
     while(lineStream >> tmp) {
       ++ctr;
     }
+    std::cout<<ctr<<" ";
     notifyByVoice(ctr);
     sleep(300);
     res = connectImap(&str, &Email, &Bearer);
   }
-  if(res) {
-    printf("Could not connect to IMAP.\n");
-  }
+  std::cout<<std::endl;
   return (int)res;
 }
