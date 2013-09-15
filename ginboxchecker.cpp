@@ -7,6 +7,7 @@
 #include <sstream>
 #include <string>
 #include <string.h>
+#include <thread>
 #include <time.h>
 #include <unistd.h>
 
@@ -119,8 +120,20 @@ void notifyByVoice(int ctr) {
   std::stringstream cmd;
   if(ctr>0) {
     cmd<<"say \"You have "<<ctr<<" new message"<<(ctr>1?"s":"")<<"!\"";
+    std::string voicecmd = cmd.str();
+    system(voicecmd.c_str());
   }
-  system(cmd.str().c_str());
+}
+
+void notifyByBanner(int ctr) {
+  std::stringstream cmd;
+  if(ctr>0) {
+    cmd<<"terminal-notifier -message ";
+    cmd<<"'Gmail: "<<ctr<<" new message"<<(ctr>1?"s":"")<<"'";
+    cmd<<"-title 'ginboxchecker' -open https://mail.google.com";
+    std::string notifcmd = cmd.str();
+    system(notifcmd.c_str());
+  }
 }
  
 int main(void)
@@ -158,8 +171,9 @@ int main(void)
     while(lineStream >> tmp) {
       ++ctr;
     }
-    notifyByVoice(ctr);
-    sleep(300);
+    std::thread thr1(notifyByBanner,ctr);
+    std::thread thr2(notifyByVoice,ctr);
+    sleep(180);
     res = connectImap(&str, &properties);
   }
   return (int)res;
