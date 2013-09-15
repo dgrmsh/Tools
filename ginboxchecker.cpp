@@ -12,7 +12,6 @@
 
 CURLcode parseConfig(std::map<std::string, std::string> *p) {
   std::ifstream ifs("ginboxchecker.conf");
-  int lnumber=1;
   if(!ifs.good()) {
     printf("Could not open ginboxchecker.conf\n");
     ifs.close();
@@ -23,12 +22,15 @@ CURLcode parseConfig(std::map<std::string, std::string> *p) {
   while(line.size()) {
     int ind = line.find("#"); //skip comments
     line = line.substr(0,ind);
+    if(!line.size()) { std::getline(ifs,line); continue; }
+    ind = line.find(";");     //skip everything after ;
+    line = line.substr(0,ind);
+    if(!line.size()) { std::getline(ifs,line); continue; }
     ind = line.find("=");
     name = line.substr(0,ind);
-    value = line.substr(ind+2, line.size()-ind-4);
+    value = line.substr(ind+2, line.size()-ind-3);
     (*p)[name]=value;
     std::getline(ifs,line);
-    ++lnumber;
   }
   bool wrong=false;
   if(!(*p)["email"].size()) {
@@ -156,11 +158,9 @@ int main(void)
     while(lineStream >> tmp) {
       ++ctr;
     }
-    std::cout<<ctr<<" ";
     notifyByVoice(ctr);
     sleep(300);
     res = connectImap(&str, &properties);
   }
-  std::cout<<std::endl;
   return (int)res;
 }
