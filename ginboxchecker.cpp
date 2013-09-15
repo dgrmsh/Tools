@@ -1,5 +1,7 @@
+#include </usr/local/include/curl/curl.h>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sstream>
@@ -7,9 +9,8 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include </usr/local/include/curl/curl.h>
 
-CURLcode parseConfig(std::string *Email, std::string *ClientId, std::string *ClientSecret, std::string *RefreshToken) {
+CURLcode parseConfig(std::map<std::string, std::string> *p) {
   std::ifstream ifs("ginboxchecker.conf");
   int lnumber=1;
   if(!ifs.good()) {
@@ -20,45 +21,29 @@ CURLcode parseConfig(std::string *Email, std::string *ClientId, std::string *Cli
   std::string line,name,value;
   std::getline(ifs,line);
   while(line.size()) {
-    int ind = line.find("=");
+    int ind = line.find("#"); //skip comments
+    line = line.substr(0,ind);
+    ind = line.find("=");
     name = line.substr(0,ind);
     value = line.substr(ind+2, line.size()-ind-4);
-    if(name.size()>0 && value.size()>0) {
-      if(name == "email") {
-        *Email = value;
-      } else if(name == "client_id") {
-        *ClientId = value;
-      } else if(name == "client_secret") {
-        *ClientSecret = value;
-      } else if(name == "refresh_token") {
-        *RefreshToken = value;
-      } else {
-        printf("Unknown parameter name in line '%s'\n",line.c_str());
-        ifs.close();
-        return CURLE_READ_ERROR;
-      }
-    } else {
-      printf("Line %d:'%s' is not of form name=value;\n",lnumber,line.c_str());
-      ifs.close();
-      return CURLE_READ_ERROR;
-    }
+    (*p)[name]=value;
     std::getline(ifs,line);
     ++lnumber;
   }
   bool wrong=false;
-  if(!Email->size()) {
+  if(!(*p)["email"].size()) {
      wrong = true;
      printf("email is missing.\n");
   }
-  if(!ClientId->size()) {
+  if(!(*p)["client_id"].size()) {
      wrong = true;
      printf("client_id is missing.\n");
   }
-  if(!ClientSecret->size()) {
+  if(!(*p)["client_secret"].size()) {
      wrong = true;
      printf("client_secret is missing.\n");
   }
-  if(!RefreshToken->size()) {
+  if(!(*p)["refresh_token"].size()) {
      wrong = true;
      printf("refresh_token is missing.\n");
   }
@@ -78,13 +63,13 @@ size_t writer( char *ptr, size_t size, size_t nmemb, void *userdata) {
    return realsize;
 }
 
-CURLcode connectImap(std::string *buffer, std::string *Email, std::string *Bearer) {
+CURLcode connectImap(std::string *buffer, std::map<std::string,std::string> *p) {
   CURL *curl;
   CURLcode res = CURLE_OK;
   curl = curl_easy_init();
   if(curl) {
-    curl_easy_setopt(curl, CURLOPT_USERNAME, Email->c_str());
-    curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER, Bearer->c_str());
+    curl_easy_setopt(curl, CURLOPT_USERNAME, (*p)["email"].c_str());
+    curl_easy_setopt(curl, CURLOPT_XOAUTH2_BEARER, (*p)["bearer"].c_str());
     curl_easy_setopt(curl, CURLOPT_URL, "imaps://imap.gmail.com:993/INBOX");
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writer);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, buffer);
@@ -95,7 +80,7 @@ CURLcode connectImap(std::string *buffer, std::string *Email, std::string *Beare
   return res;
 }
 
-CURLcode refreshToken(std::string *ClientId, std::string *ClientSecret, std::string *RefreshToken, std::string *Bearer) {
+CURLcode refreshToken(std::map<std::string, std::string> *p) {
   CURL *curl;
   CURLcode res = CURLE_OK;
   curl = curl_easy_init();
@@ -103,8 +88,10 @@ CURLcode refreshToken(std::string *ClientId, std::string *ClientSecret, std::str
     curl_easy_setopt(curl, CURLOPT_URL, "https://accounts.google.com/o/oauth2/token");
     curl_easy_setopt(curl, CURLOPT_POST, 1);
     std::stringstream cmd;
-    cmd<<"client_id="<<*ClientId<<"&client_secret="<<*ClientSecret;
-    cmd<<"&refresh_token="<<*RefreshToken<<"&grant_type=refresh_token";
+    cmd<<"client_id="<<(*p)["client_id"];
+    cmd<<"&client_secret="<<(*p)["client_secret"];
+    cmd<<"&refresh_token="<<(*p)["refresh_token"];
+    cmd<<"&grant_type=refresh_token";
     std::string postcmd=cmd.str();
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postcmd.c_str());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writer);
@@ -119,7 +106,7 @@ CURLcode refreshToken(std::string *ClientId, std::string *ClientSecret, std::str
         b>>tmp;
       }
       b>>tmp;
-      *Bearer=tmp.substr(1,tmp.size()-3);
+      (*p)["bearer"]=tmp.substr(1,tmp.size()-3);
     }
   }
   curl_easy_cleanup(curl);
@@ -136,11 +123,12 @@ void notifyByVoice(int ctr) {
  
 int main(void)
 {
-  std::string str, Email, ClientId, ClientSecret, RefreshToken, Bearer;
+  std::string str;
   CURLcode res;
+  std::map<std::string, std::string> properties;
   time_t nextrefresh = 0;
   time_t tnow;
-  res = parseConfig(&Email, &ClientId, &ClientSecret, &RefreshToken);
+  res = parseConfig(&properties);
   if(res) {
     printf("Could not parse the ginboxchecker.conf file. Exiting..\n");
     return (int)res;
@@ -149,13 +137,13 @@ int main(void)
     tnow = time(0);
     if(tnow > nextrefresh) {
       nextrefresh = tnow + 3600;
-      res = refreshToken(&ClientId, &ClientSecret, &RefreshToken, &Bearer);
+      res = refreshToken(&properties);
       if(res) {
         printf("Could not refresh the token. Exiting..\n");
         return (int)res;
       }
     }
-    res = connectImap(&str, &Email, &Bearer);
+    res = connectImap(&str, &properties);
     if(res) {
       printf("Could not connect to IMAP.\n");
       return (int)res;
@@ -171,7 +159,7 @@ int main(void)
     std::cout<<ctr<<" ";
     notifyByVoice(ctr);
     sleep(300);
-    res = connectImap(&str, &Email, &Bearer);
+    res = connectImap(&str, &properties);
   }
   std::cout<<std::endl;
   return (int)res;
