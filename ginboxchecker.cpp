@@ -130,7 +130,7 @@ void notifyByBanner(int ctr) {
   if(ctr>0) {
     cmd<<"terminal-notifier -message ";
     cmd<<"'Gmail: "<<ctr<<" new message"<<(ctr>1?"s":"")<<"'";
-    cmd<<"-title 'ginboxchecker' -open https://mail.google.com";
+    cmd<<" -title 'ginboxchecker' -open https://mail.google.com";
     std::string notifcmd = cmd.str();
     system(notifcmd.c_str());
   }
@@ -151,7 +151,7 @@ int main(void)
   while(true) {
     tnow = time(0);
     if(tnow > nextrefresh) {
-      nextrefresh = tnow + 3600;
+      nextrefresh = tnow + 3300;
       res = refreshToken(&properties);
       if(res) {
         printf("Could not refresh the token. Exiting..\n");
