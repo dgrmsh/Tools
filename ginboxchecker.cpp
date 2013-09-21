@@ -78,6 +78,16 @@ CURLcode connectImap(std::string *buffer, std::map<std::string,std::string> *p) 
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, buffer);
     curl_easy_setopt(curl, CURLOPT_CUSTOMREQUEST, "SEARCH UNSEEN");
     res = curl_easy_perform(curl);
+    bool noinet=false;
+    while(res==6 || res==7) {
+      system("say \"Network problem, retry in 1 minute.\"");
+      noinet=true;
+      sleep(60);
+      res = curl_easy_perform(curl);
+    }
+    if (noinet) {
+      system("say \"Network fixed.\"");
+    }
   }
   curl_easy_cleanup(curl);
   return res;
@@ -101,6 +111,16 @@ CURLcode refreshToken(std::map<std::string, std::string> *p) {
     std::string buffer;
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &buffer);
     res = curl_easy_perform(curl);
+    bool noinet=false;
+    while(res==6 || res==7) {
+      system("say \"Network problem, retry in 1 minute.\"");
+      noinet=true;
+      sleep(60);
+      res = curl_easy_perform(curl);
+    }   
+    if (noinet) {
+      system("say \"Network fixed.\"");
+    } 
     if(!res) {
       std::stringstream b(buffer);
       std::string tmp;
