@@ -151,6 +151,7 @@ void notifyByBanner(int ctr) {
     cmd<<"terminal-notifier -message ";
     cmd<<"'Gmail: "<<ctr<<" new message"<<(ctr>1?"s":"")<<"'";
     cmd<<" -title 'ginboxchecker' -open https://mail.google.com";
+    cmd<<" -sender com.apple.Terminal";
     std::string notifcmd = cmd.str();
     system(notifcmd.c_str());
   }
